@@ -13,11 +13,18 @@ router = APIRouter()
 @router.post("", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
     # 1. Validate restaurant table exists
-    table = db.query(RestaurantTable).filter(RestaurantTable.id == order_in.table_id).first()
+    if order_in.table_id is not None:
+        table = db.query(RestaurantTable).filter(RestaurantTable.id == order_in.table_id).first()
+    else:
+        table = (
+            db.query(RestaurantTable)
+            .filter(RestaurantTable.table_number == order_in.table_number)
+            .first()
+        )
     if not table:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Table with id {order_in.table_id} not found"
+            detail="Restaurant table not found"
         )
     
     # 2. Find or create customer

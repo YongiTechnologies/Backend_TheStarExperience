@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  name        String    @db.VarChar
+  phoneNumber String    @map("phone_number") @db.VarChar
+  id          Int       @id @default(autoincrement())
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamptz(6)
+  orders      Order[]
+
+  @@index([id], map: "ix_customers_id")
+  @@map("customers")
+}
+
+model RestaurantTable {
+  tableNumber String    @unique(map: "ix_restaurant_tables_table_number") @map("table_number") @db.VarChar
+  capacity    Int?
+  id          Int       @id @default(autoincrement())
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamptz(6)
+  orders      Order[]
+
+  @@index([id], map: "ix_restaurant_tables_id")
+  @@map("restaurant_tables")
+}
+
+model MenuCategory {
+  name        String     @unique(map: "ix_menu_categories_name") @db.VarChar
+  description String?
+  id          Int        @id @default(autoincrement())
+  createdAt   DateTime?  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime?  @map("updated_at") @db.Timestamptz(6)
+  items       MenuItem[]
+
+  @@index([id], map: "ix_menu_categories_id")
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  categoryId  Int          @map("category_id")
+  name        String       @db.VarChar
+  description String?
+  price       Float
+  isAvailable Boolean?     @map("is_available")
+  id          Int          @id @default(autoincrement())
+  createdAt   DateTime?    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime?    @map("updated_at") @db.Timestamptz(6)
+  category    MenuCategory @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  orderItems  OrderItem[]
+
+  @@index([id], map: "ix_menu_items_id")
+  @@index([name], map: "ix_menu_items_name")
+  @@map("menu_items")
+}
+
+model Order {
+  customerId  Int             @map("customer_id")
+  tableId     Int             @map("table_id")
+  status      orderstatus
+  totalAmount Float           @map("total_amount")
+  id          Int             @id @default(autoincrement())
+  createdAt   DateTime?       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime?       @map("updated_at") @db.Timestamptz(6)
+  items       OrderItem[]
+  customer    Customer        @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  table       RestaurantTable @relation(fields: [tableId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payment     Payment?
+
+  @@index([id], map: "ix_orders_id")
+  @@map("orders")
+}
+
+model OrderItem {
+  orderId    Int       @map("order_id")
+  menuItemId Int       @map("menu_item_id")
+  quantity   Int
+  unitPrice  Float     @map("unit_price")
+  id         Int       @id @default(autoincrement())
+  createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime? @map("updated_at") @db.Timestamptz(6)
+  menuItem   MenuItem  @relation(fields: [menuItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_order_items_id")
+  @@map("order_items")
+}
+
+model Payment {
+  orderId   Int           @unique @map("order_id")
+  amount    Float
+  status    paymentstatus
+  provider  String?       @db.VarChar
+  reference String?       @unique @db.VarChar
+  id        Int           @id @default(autoincrement())
+  createdAt DateTime?     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime?     @map("updated_at") @db.Timestamptz(6)
+  order     Order         @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_payments_id")
+  @@map("payments")
+}
+
+model User {
+  username       String    @unique(map: "ix_users_username") @db.VarChar
+  hashedPassword String    @map("hashed_password") @db.VarChar
+  id             Int       @id @default(autoincrement())
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime? @map("updated_at") @db.Timestamptz(6)
+
+  @@index([id], map: "ix_users_id")
+  @@map("users")
+}
+
+enum orderstatus {
+  pending
+  paid
+  preparing
+  ready
+  completed
+  cancelled
+}
+
+enum paymentstatus {
+  unpaid
+  pending
+  paid
+  failed
+  refunded
+}

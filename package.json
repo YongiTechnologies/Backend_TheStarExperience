@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "db:pull": "prisma db pull",
+    "studio": "prisma studio"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.0"
+  }
+}
