@@ -9,11 +9,23 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     ADMIN_USERNAME: str = "admin"
     CORS_ORIGINS: str = "http://localhost:3000"
+    # Kept for compatibility with existing local configuration. Prefer
+    # CORS_ORIGINS for new deployments because it supports multiple origins.
+    FRONTEND_URL: str | None = None
 
     @property
     def cors_origins(self) -> list[str]:
         """Comma-separated frontend origins, kept configurable per deployment."""
-        return [origin.strip().rstrip("/") for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        origins = [
+            origin.strip().rstrip("/")
+            for origin in self.CORS_ORIGINS.split(",")
+            if origin.strip()
+        ]
+        if self.FRONTEND_URL:
+            frontend_origin = self.FRONTEND_URL.strip().rstrip("/")
+            if frontend_origin and frontend_origin not in origins:
+                origins.append(frontend_origin)
+        return origins
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
