@@ -1,14 +1,19 @@
-import os
-
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-load_dotenv()
+from app.core.config import settings
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# settings reads .env and normalizes the URL, so the app, seed scripts and
+# Alembic all connect the same way.
+engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
 
-engine = create_engine(DATABASE_URL)
+if engine.dialect.name == "sqlite":
+    # SQLite ignores foreign keys unless enabled per connection; PostgreSQL always enforces them.
+    @event.listens_for(engine, "connect")
+    def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 SessionLocal = sessionmaker(
     bind=engine,

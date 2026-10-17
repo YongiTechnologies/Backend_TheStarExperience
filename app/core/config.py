@@ -6,7 +6,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # A full event shift, so bar staff aren't signed out mid-service.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 720
     ADMIN_USERNAME: str = "admin"
     CORS_ORIGINS: str = "http://localhost:3000"
     # Kept for compatibility with existing local configuration. Prefer
@@ -29,10 +30,15 @@ class Settings(BaseSettings):
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
-    def use_installed_postgres_driver(cls, value: str) -> str:
-        """Use psycopg v3 for conventional PostgreSQL connection URLs."""
-        if isinstance(value, str) and value.startswith("postgresql://"):
-            return value.replace("postgresql://", "postgresql+psycopg://", 1)
+    def use_psycopg2_driver(cls, value: str) -> str:
+        """Pin PostgreSQL URLs to psycopg2, the driver in requirements.txt.
+        SQLAlchemy 2.1 maps a bare "postgresql://" to psycopg 3, which isn't
+        installed, and many hosts hand out "postgres://", which SQLAlchemy
+        rejects. URLs that already name a driver are left alone."""
+        if isinstance(value, str):
+            for scheme in ("postgres://", "postgresql://"):
+                if value.startswith(scheme):
+                    return "postgresql+psycopg2://" + value[len(scheme):]
         return value
     
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

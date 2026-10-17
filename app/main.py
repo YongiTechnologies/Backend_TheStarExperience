@@ -1,3 +1,6 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -5,11 +8,29 @@ from app.routers import admin, auth, health, menu, orders, payments, tables
 from sqlalchemy import text
 
 from app.database.connection import engine
+from app.database.schema_upgrades import upgrade_schema
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Bring existing databases up to date (additive only) before serving requests.
+    # Failing here is deliberate: a deploy that can't upgrade the schema should not
+    # go live (the previous version keeps serving) rather than 500 on every order.
+    try:
+        upgrade_schema(engine)
+    except Exception:
+        logger.exception("Schema upgrade failed; refusing to start")
+        raise
+    yield
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Backend API for The Star Experience",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Configure CORS for Next.js frontend
