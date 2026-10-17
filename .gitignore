@@ -1,0 +1,21 @@
+# Secrets: configure real values in .env locally and in the host's dashboard.
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node (Prisma Studio tooling)
+node_modules/
+
+# Editors
+.vscode/
+.idea/
+
+# Source artwork; the optimised copies live in the frontend (public/assets/menu)
+menu-images/
