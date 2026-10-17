@@ -31,10 +31,11 @@ def serialize_order(order: Order) -> dict:
         "items": [
             {
                 "id": str(item.id),
-                "name": item.menu_item.name,
+                # Tolerate lines whose menu item was removed, so one bad row can't take down the board.
+                "name": item.menu_item.name if item.menu_item else f"Removed item #{item.menu_item_id}",
                 "price": item.unit_price,
                 "quantity": item.quantity,
-                "category": item.menu_item.category.name if item.menu_item.category else None,
+                "category": item.menu_item.category.name if item.menu_item and item.menu_item.category else None,
                 "notes": None,
             }
             for item in order.items
@@ -47,10 +48,12 @@ def serialize_order(order: Order) -> dict:
             if not order.payment or order.payment.status.value in {"unpaid", "pending"}
             else order.payment.status.value
         ),
-        "payment_method": order.payment.provider if order.payment else None,
+        "payment_method": order.payment.method if order.payment else None,
+        "momo_network": order.payment.network if order.payment else None,
+        "payment_provider": order.payment.provider if order.payment else None,
         "created_at": order.created_at,
         "updated_at": order.updated_at,
-        "notes": None,
+        "notes": order.notes,
     }
 
 
@@ -138,6 +141,13 @@ def delete_menu_item(item_id: int, db: Session = Depends(get_db)) -> Response:
     item = db.get(MenuItem, item_id)
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Menu item not found")
+    # Checked explicitly: SQLite doesn't enforce foreign keys unless asked, and a
+    # deleted item would orphan its order lines and break the order board.
+    if db.query(OrderItem.id).filter(OrderItem.menu_item_id == item_id).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This menu item cannot be deleted because it belongs to an order",
+        )
     db.delete(item)
     try:
         db.commit()
