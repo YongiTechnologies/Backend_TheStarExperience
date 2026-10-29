@@ -1,0 +1,2 @@
+# Files used on the Linux server keep Unix line endings on every checkout.
+* text=auto eol=lf

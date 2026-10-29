@@ -1,0 +1,103 @@
+# The Star Experience on the shared Hetzner server (/opt/the-star).
+#
+# Self-contained: its own project name, network and images, and NO published ports.
+# The internet reaches it only through a Cloudflare Tunnel (the "tunnel" service dials
+# out to Cloudflare), so it never competes with other apps on this server for 80/443.
+#
+#   Cloudflare (https://$STAR_DOMAIN) -> tunnel -> router:80
+#       /api/*  -> backend:8000   FastAPI
+#       else    -> frontend:3000  Next.js
+#   backend -> db:5432            PostgreSQL 17, private to this stack, data in a named volume
+#
+# Config lives next to this file on the server (both mode 600, never committed):
+#   .env         compose variables: STAR_DOMAIN, TUNNEL_TOKEN, database passwords
+#                (deploy.sh refuses to go live until STAR_DOMAIN and TUNNEL_TOKEN are set;
+#                 the database and backups work without them)
+#   backend.env  backend settings: SECRET_KEY, ADMIN_USERNAME, VAPID keys, ...
+name: the-star
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: the_star
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # Read by db-init.sh to create the app's own, non-superuser login.
+      APP_DB_USER: star_app
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}
+    command: ["postgres", "-c", "max_connections=50"]
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db-init.sh:/docker-entrypoint-initdb.d/10-app-user.sh:ro
+    networks: [star]
+    shm_size: 128m
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d the_star"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *logging
+
+  backend:
+    build: ${BACKEND_DIR:-./src/backend}
+    image: the-star-backend
+    restart: unless-stopped
+    env_file: backend.env
+    environment:
+      DATABASE_URL: postgresql://star_app:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}@db:5432/the_star
+      # Same address as the site, so browsers make same-origin API calls.
+      CORS_ORIGINS: https://${STAR_DOMAIN}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [star]
+    mem_limit: 512m
+    logging: *logging
+
+  frontend:
+    build:
+      context: ${FRONTEND_DIR:-./src/frontend}
+      args:
+        NEXT_PUBLIC_API_URL: https://${STAR_DOMAIN}
+    image: the-star-frontend
+    restart: unless-stopped
+    networks: [star]
+    mem_limit: 384m
+    logging: *logging
+
+  router:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on: [backend, frontend]
+    networks: [star]
+    mem_limit: 128m
+    logging: *logging
+
+  tunnel:
+    image: cloudflare/cloudflared:2026.5.2
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on: [router]
+    networks: [star]
+    mem_limit: 128m
+    logging: *logging
+
+networks:
+  star: {}
+
+volumes:
+  db-data:
