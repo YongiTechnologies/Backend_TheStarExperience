@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+supabase.txt
+*.secret.txt
 
 # Python
 __pycache__/
@@ -9,6 +11,9 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+
+# Local SQLite databases (development data, may hold customer details)
+*.db
 
 # Node (Prisma Studio tooling)
 node_modules/
@@ -19,3 +24,8 @@ node_modules/
 
 # Source artwork; the optimised copies live in the frontend (public/assets/menu)
 menu-images/
+# Server connection notes (contain passwords)
+CONNECTION.md
+# Server-side deploy config (secrets)
+deploy/hetzner/.env
+deploy/hetzner/backend.env
