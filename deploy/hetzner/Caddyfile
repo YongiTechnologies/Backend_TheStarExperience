@@ -1,0 +1,25 @@
+# Internal router for The Star (plain HTTP inside the Docker network; Cloudflare
+# terminates HTTPS and the tunnel brings requests here). Not reachable from outside.
+{
+	auto_https off
+	admin off
+	servers {
+		# Requests arrive via the tunnel container; keep the real client IP and https.
+		trusted_proxies static private_ranges
+	}
+}
+
+:80 {
+	# The API, including the live-update stream for staff screens.
+	handle /api/* {
+		reverse_proxy backend:8000 {
+			# Server-Sent Events must reach staff screens immediately, unbuffered.
+			flush_interval -1
+		}
+	}
+
+	# Everything else is the web app.
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
