@@ -56,6 +56,8 @@ class OrderResponse(BaseModel):
     customer_id: int
     table_id: int
     table_number: Optional[str] = None
+    # First name of the waiter looking after the order, once they've accepted it.
+    waiter_name: Optional[str] = None
     status: OrderStatus
     total_amount: float
     notes: Optional[str] = None
@@ -93,6 +95,13 @@ class AdminOrderResponse(BaseModel):
     momo_network: Optional[str] = None
     # "demo" while checkout is simulated: no money has actually been collected.
     payment_provider: Optional[str] = None
+    waiter_id: Optional[int] = None
+    waiter_name: Optional[str] = None
+    accepted_at: Optional[datetime] = None
+    kitchen_status: Optional[str] = None
+    bar_status: Optional[str] = None
+    ready_at: Optional[datetime] = None
+    served_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     notes: Optional[str] = None

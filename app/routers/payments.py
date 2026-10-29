@@ -16,6 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.events import emit
 from app.core.order_access import get_order_for_guest, guest_order_token
 from app.database.connection import get_db
 from app.models.order import OrderStatus
@@ -93,6 +94,7 @@ def verify_payment(verify_in: PaymentVerifyRequest, db: Session = Depends(get_db
         )
 
     payment.status = PaymentStatus.paid
+    emit(db, "order.updated", order_id=order.id, table_number=order.table_number)
     db.commit()
     db.refresh(payment)
     return payment

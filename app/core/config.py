@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     # Kept for compatibility with existing local configuration. Prefer
     # CORS_ORIGINS for new deployments because it supports multiple origins.
     FRONTEND_URL: str | None = None
+    # Web Push (alerts on staff phones while the screen is locked). Leave unset to turn it off.
+    # Generate a key pair once with `python -m app.core.push` and keep the private key secret.
+    VAPID_PUBLIC_KEY: str | None = None
+    VAPID_PRIVATE_KEY: str | None = None
+    # Contact the push services (Google, Apple, Mozilla) can reach about this sender.
+    VAPID_SUBJECT: str = "mailto:admin@example.com"
 
     @property
     def cors_origins(self) -> list[str]:

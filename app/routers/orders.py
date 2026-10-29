@@ -1,9 +1,16 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from app.core.activity import log_activity
+from app.core.events import emit
+from app.core.push import notify_order_for_waiter
 from app.core.order_access import ORDER_DETAIL_OPTIONS, get_order_for_guest, guest_order_token, new_tracking_token
 from app.core.security import require_admin
+from app.core.staff_orders import route_waiter
+from app.core.stations import Station, StationStatus, set_station_status, station_for_category
 from app.database.connection import get_db
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.table import RestaurantTable
@@ -59,6 +66,8 @@ def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
     # 3. Fetch menu items & calculate total
     total_amount = 0.0
     items_to_add = []
+    stations = set()
+    summary_lines = []
     
     for item in order_in.items:
         menu_item = db.query(MenuItem).filter(MenuItem.id == item.menu_item_id).first()
@@ -75,9 +84,13 @@ def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
         
         unit_price = menu_item.price
         total_amount += unit_price * item.quantity
-        items_to_add.append((item.menu_item_id, item.quantity, unit_price))
+        station = station_for_category(menu_item.category.name if menu_item.category else None)
+        items_to_add.append((item.menu_item_id, item.quantity, unit_price, station))
+        summary_lines.append((item.quantity, menu_item.name))
+        stations.add(station)
 
-    # 4. Create Order
+    # 4. Create Order, routed to the table's waiter and queued at the stations it needs
+    waiter = route_waiter(table)
     new_order = Order(
         customer_id=customer.id,
         table_id=table.id,
@@ -86,19 +99,33 @@ def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
         notes=order_in.notes,
         tracking_token=new_tracking_token(),
         idempotency_key=order_in.idempotency_key,
+        waiter_id=waiter.id if waiter else None,
+        assigned_at=datetime.now(timezone.utc) if waiter else None,
     )
+    for station in Station:
+        set_station_status(new_order, station, StationStatus.queued.value if station in stations else None)
     db.add(new_order)
     db.flush()
 
     # 5. Create Order Items
-    for menu_item_id, quantity, unit_price in items_to_add:
+    for menu_item_id, quantity, unit_price, station in items_to_add:
         order_item = OrderItem(
             order_id=new_order.id,
             menu_item_id=menu_item_id,
             quantity=quantity,
-            unit_price=unit_price
+            unit_price=unit_price,
+            station=station.value,
         )
         db.add(order_item)
+
+    log_activity(
+        db, "order.placed", order_id=new_order.id, table_id=table.id,
+        table_number=table.table_number, routed_to=waiter.name if waiter else None,
+        stations=sorted(s.value for s in stations),
+    )
+    emit(db, "order.created", order_id=new_order.id, table_number=table.table_number, waiter_id=new_order.waiter_id)
+    if waiter:
+        notify_order_for_waiter(db, new_order, waiter.id, lines=summary_lines)
 
     try:
         db.commit()

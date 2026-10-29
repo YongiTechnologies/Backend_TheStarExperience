@@ -11,6 +11,7 @@ from app.models.order import Order, OrderItem
 ORDER_DETAIL_OPTIONS = (
     joinedload(Order.customer),
     joinedload(Order.table),
+    joinedload(Order.waiter),
     joinedload(Order.payment),
     joinedload(Order.items).joinedload(OrderItem.menu_item),
 )

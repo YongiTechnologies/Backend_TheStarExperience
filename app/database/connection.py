@@ -5,7 +5,8 @@ from app.core.config import settings
 
 # settings reads .env and normalizes the URL, so the app, seed scripts and
 # Alembic all connect the same way.
-engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
+# pre_ping + recycle: hosted poolers (e.g. Supabase) close idle connections.
+engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True, pool_recycle=300)
 
 if engine.dialect.name == "sqlite":
     # SQLite ignores foreign keys unless enabled per connection; PostgreSQL always enforces them.
