@@ -18,5 +18,7 @@ class MenuItem(BaseModel):
     description = Column(Text, nullable=True)
     price = Column(Float, nullable=False)
     is_available = Column(Boolean, default=True)
+    # The Loyverse item variant sold receipts point at (see app/core/loyverse.py).
+    loyverse_variant_id = Column(String(64), nullable=True)
     
     category = relationship("MenuCategory", back_populates="items")

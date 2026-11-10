@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.routers import admin, auth, health, menu, orders, payments, staff, staff_admin, tables
+from app.routers import admin, auth, health, loyverse, menu, orders, payments, staff, staff_admin, tables
 from sqlalchemy import text
 
 from app.core.events import PostgresListener
@@ -77,4 +77,5 @@ app.include_router(payments.router, prefix="/api/payments", tags=["payments"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(staff_admin.router, prefix="/api/admin", tags=["staff admin"])
+app.include_router(loyverse.router, prefix="/api/admin/loyverse", tags=["loyverse"])
 app.include_router(staff.router, prefix="/api/staff", tags=["staff"])

@@ -53,6 +53,13 @@ def authenticate(username: str, password: str, db: Session) -> Token:
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    # Without a role every request after login would be refused, which the dashboard
+    # shows as "session ended". Say what's actually wrong instead.
+    if not effective_role(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account has no role yet. Ask an admin to give it one.",
+        )
     access_token = create_access_token(subject=user.username)
     return Token(access_token=access_token, token_type="bearer")
 

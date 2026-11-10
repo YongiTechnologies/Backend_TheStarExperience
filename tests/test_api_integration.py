@@ -1,46 +1,4 @@
 from fastapi.testclient import TestClient
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-from app.core.security import get_password_hash
-from app.database.connection import Base, get_db
-from app.main import app
-from app.models import MenuCategory, RestaurantTable, User
-
-
-@pytest.fixture()
-def client():
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base.metadata.create_all(bind=engine)
-
-    db = TestingSession()
-    db.add_all([
-        User(username="admin", hashed_password=get_password_hash("test-admin-password")),
-        RestaurantTable(table_number="12", capacity=4),
-    ])
-    db.commit()
-    db.close()
-
-    def override_get_db():
-        session = TestingSession()
-        try:
-            yield session
-        finally:
-            session.close()
-
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
-    Base.metadata.drop_all(bind=engine)
-    engine.dispose()
 
 
 def test_admin_menu_and_order_workflow(client: TestClient):
@@ -83,7 +41,10 @@ def test_admin_menu_and_order_workflow(client: TestClient):
         },
     )
     assert order.status_code == 201
-    assert client.get(f"/api/orders/{order.json()['id']}").status_code == 200
+    order_url = f"/api/orders/{order.json()['id']}"
+    assert client.get(order_url).status_code == 404  # tracking token required
+    tracked = client.get(order_url, headers={"X-Order-Token": order.json()["tracking_token"]})
+    assert tracked.status_code == 200
 
     admin_orders = client.get("/api/admin/orders", headers=headers)
     assert admin_orders.status_code == 200
@@ -97,3 +58,19 @@ def test_admin_menu_and_order_workflow(client: TestClient):
     )
     assert updated.status_code == 200
     assert updated.json()["status"] == "preparing"
+
+
+def test_login_without_role_is_refused_up_front(client: TestClient):
+    from app.core.security import get_password_hash
+    from app.database.connection import get_db
+    from app.main import app
+    from app.models import User
+
+    session = next(app.dependency_overrides[get_db]())
+    session.add(User(username="owner@example.com", hashed_password=get_password_hash("pw-12345678")))
+    session.commit()
+    session.close()
+
+    login = client.post("/api/auth/token", data={"username": "owner@example.com", "password": "pw-12345678"})
+    assert login.status_code == 403
+    assert "no role" in login.json()["detail"]

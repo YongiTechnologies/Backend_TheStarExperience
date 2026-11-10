@@ -40,9 +40,15 @@ ADDITIVE_COLUMNS: dict[str, dict[str, str]] = {
     "order_items": {
         "station": "VARCHAR(16)",
     },
+    "menu_items": {
+        "loyverse_variant_id": "VARCHAR(64)",
+    },
     "payments": {
         "method": "VARCHAR(16)",
         "network": "VARCHAR(16)",
+        "loyverse_receipt_number": "VARCHAR(32)",
+        "loyverse_sync_status": "VARCHAR(16)",
+        "loyverse_sync_error": "TEXT",
     },
     "restaurant_tables": {
         "waiter_id": "INTEGER REFERENCES users(id)",

@@ -95,6 +95,12 @@ class AdminOrderResponse(BaseModel):
     momo_network: Optional[str] = None
     # "demo" while checkout is simulated: no money has actually been collected.
     payment_provider: Optional[str] = None
+    # Loyverse sales receipt for this order: "synced", "failed" (retry it), "skipped"
+    # (demo payment in live mode) or None (not paid yet).
+    loyverse_receipt_number: Optional[str] = None
+    loyverse_sync_status: Optional[str] = None
+    # Why the last sync failed or was skipped; None once synced.
+    loyverse_sync_error: Optional[str] = None
     waiter_id: Optional[int] = None
     waiter_name: Optional[str] = None
     accepted_at: Optional[datetime] = None

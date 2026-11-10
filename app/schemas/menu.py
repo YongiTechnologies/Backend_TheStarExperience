@@ -23,6 +23,8 @@ class MenuItemAvailabilityUpdate(BaseModel):
 
 class MenuItemResponse(MenuItemBase):
     id: int
+    # Loyverse item variant this menu item is linked to; None until linked.
+    loyverse_variant_id: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 

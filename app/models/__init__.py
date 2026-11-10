@@ -7,6 +7,7 @@ from app.models.payment import Payment
 from app.models.user import User
 from app.models.activity import ActivityEvent
 from app.models.device import PushSubscription, StaffDevice
+from app.models.loyverse import SimulatedLoyverseReceipt
 
 __all__ = [
     "Base",
@@ -21,4 +22,5 @@ __all__ = [
     "ActivityEvent",
     "StaffDevice",
     "PushSubscription",
+    "SimulatedLoyverseReceipt",
 ]

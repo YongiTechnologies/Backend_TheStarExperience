@@ -8,6 +8,7 @@ from typing import List
 
 from urllib.parse import urlsplit
 
+from fastapi.concurrency import run_in_threadpool
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -259,14 +260,20 @@ async def event_stream(request: Request, token: str = Depends(oauth2_scheme)):
     # Authenticate with a short-lived session rather than a request-scoped dependency,
     # so a minute-long stream doesn't hold a database connection.
     session_factory = request.app.dependency_overrides.get(get_db, get_db)
-    sessions = session_factory()
-    db = next(sessions)
-    try:
-        user = resolve_user(db, token)
-        if effective_role(user) not in {role.value for role in StaffRole}:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Staff only")
-    finally:
-        sessions.close()
+
+    def authenticate() -> None:
+        sessions = session_factory()
+        db = next(sessions)
+        try:
+            user = resolve_user(db, token)
+            if effective_role(user) not in {role.value for role in StaffRole}:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Staff only")
+        finally:
+            sessions.close()
+
+    # Blocking database work runs in a worker thread: on the event loop it would stall
+    # every other request (payments included) for each screen that connects.
+    await run_in_threadpool(authenticate)
 
     queue = bus.subscribe()
 
